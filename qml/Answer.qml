@@ -59,6 +59,6 @@ Item {
         if (userResponseWithoutNumbers.toLowerCase() === correctAnswerWithoutNumbers.toLowerCase()) {
             answer.correct = true
         }
-        answer.checkAnswerCallback()
+        answer.checkAnswerCallback(answer.correct)
     }
 }

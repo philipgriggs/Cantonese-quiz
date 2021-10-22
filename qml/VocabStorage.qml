@@ -6,50 +6,66 @@ Item {
 
     // all the vocab in the file
     property var vocab: []
+    property int quizLength
+    property int learnedWords
+    property int requiredCorrect: 1
 
     // shuffle the questions and choose the first n to use in the quiz
     function selectCardsForQuiz() {
-        var shuffledVocab = shuffle(vocab)
-        var splitQuestionAndAnsers = []
+        var shuffledVocab = shuffleVocab()
+        var splitQuestionAndAnswers = []
         for (var i = 0; i < quizLength; i++) {
             // the answer may be either english or cantonese
-            var question = shuffledVocab[i].Cantonese
-            var answer = shuffledVocab[i].English
-            if (i%2 === 0) {
-                question = shuffledVocab[i].English
-                answer = shuffledVocab[i].Cantonese
+            var questionAndAnswer = {
+                "question": shuffledVocab[i].Cantonese,
+                "answer": shuffledVocab[i].English,
+                "index": shuffledVocab[i].index,
+                "isEnglish": true
             }
-            var questionAndAnswer = splitAnswers(question, answer)
-            splitQuestionAndAnsers.push(questionAndAnswer)
+            if (i%2 === 0) {
+                questionAndAnswer.question = shuffledVocab[i].English
+                questionAndAnswer.answer = shuffledVocab[i].Cantonese
+                questionAndAnswer.isEnglish = false
+            }
+            var splitQuestionAndAnswer = splitAnswers(questionAndAnswer)
+            splitQuestionAndAnswers.push(splitQuestionAndAnswer)
         }
-        return splitQuestionAndAnsers
+        return splitQuestionAndAnswers
     }
 
     // split up the anwers by the special charset `\b`
-    function splitAnswers(question, answer) {
-        var splitAnswers = answer.split('\b')
+    function splitAnswers(questionAndAnswer) {
+        var splitAnswers = questionAndAnswer.answer.split('\b')
         var blankAnswerIdx = Math.floor(Math.random()*splitAnswers.length)
-        var questionAndAnswer = {
-            "question": question,
-            "answers": []
+        var splitQuestionAndAnswer = {
+            "question": questionAndAnswer.question,
+            "answers": [],
+            "index": questionAndAnswer.index,
+            "isEnglish": questionAndAnswer.isEnglish
         }
         for (var i = 0; i < splitAnswers.length; i++) {
-            questionAndAnswer.answers.push({
-                                               "answer": splitAnswers[i],
-                                               "isBlank": i === blankAnswerIdx
-                                           })
+            splitQuestionAndAnswer.answers.push({
+                                                    "answer": splitAnswers[i],
+                                                    "isBlank": i === blankAnswerIdx
+                                                })
         }
-        return questionAndAnswer
+        return splitQuestionAndAnswer
     }
 
     // Fisher-Yates shuffle
-    function shuffle(array) {
-        var shuffledArray = array.slice()
-        for (let i = shuffledArray.length - 1; i > 0; i--) {
-            let j = Math.floor(Math.random() * (i + 1)); // random index from 0 to i
-            [shuffledArray[i], shuffledArray[j]] = [shuffledArray[j], shuffledArray[i]];
+    function shuffleVocab() {
+        var chosenWords = []
+        for (var i = 0; i < vocab.length && chosenWords.length < learnedWords; i++) {
+            if (vocab[i].correctCantonese < requiredCorrect || vocab[i].correctEnglish < requiredCorrect) {
+                chosenWords.push(vocab[i])
+            }
         }
-        return shuffledArray
+
+        for (let i = chosenWords.length - 1; i > 0; i--) {
+            let j = Math.floor(Math.random() * (i + 1)); // random index from 0 to i
+            [chosenWords[i], chosenWords[j]] = [chosenWords[j], chosenWords[i]];
+        }
+        return chosenWords
     }
 
     function parseJson(filePath) {
@@ -59,10 +75,29 @@ Item {
         for(var i = 0; i < vocabJson.length; i++) {
             var sentenceAndTranslation = vocabJson[i]
             sentenceAndTranslation.correctCantonese = 0
-            sentenceAndTranslation.incorrectCantonese = 0
             sentenceAndTranslation.correctEnglish = 0
-            sentenceAndTranslation.incorrectEnglish = 0
+            sentenceAndTranslation.index = i
             vocab.push(sentenceAndTranslation)
+        }
+    }
+
+    function incrementStats(questionAndAnswer, correct) {
+        var data = vocab[questionAndAnswer.index]
+        if (questionAndAnswer.isEnglish && correct) {
+            data.correctEnglish++
+            return
+        }
+        if (questionAndAnswer.isEnglish && !correct && data.correctEnglish > 0) {
+            data.correctEnglish--
+            return
+        }
+        if (!questionAndAnswer.isEnglish && correct) {
+            data.correctCantonese++
+            return
+        }
+        if (!questionAndAnswer.isEnglish && !correct && data.correctCantonese > 0) {
+            data.correctCantonese--
+            return
         }
     }
 }
