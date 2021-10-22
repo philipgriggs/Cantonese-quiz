@@ -58,3 +58,7 @@ win32 {
 macx {
     ICON = macx/app_icon.icns
 }
+
+DISTFILES += \
+    qml/VocabStorage.qml
+    qml/Answer.qml

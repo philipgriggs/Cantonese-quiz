@@ -2,15 +2,18 @@ import Felgo 3.0
 import QtQuick 2.0
 
 App {
-    property var vocab: []
     property var quizLength: 10
     screenWidth: 720
     screenHeight: 1280
 
+    VocabStorage {
+        id: vocabStorage
+    }
+
     NavigationStack {
         id: navigationStack
         Component.onCompleted: {
-            parseJson("../assets/vocab.json")
+            vocabStorage.parseJson("../assets/vocab.json")
             navigationStack.push(titlePageComponent)
         }
     }
@@ -37,79 +40,63 @@ App {
             property var questions: []
             title: "Quiz"
             Component.onCompleted: {
-                questions = selectCardsForQuiz()
+                questions = vocabStorage.selectCardsForQuiz()
             }
             Repeater {
-                id: repeater
+                id: questionRepeater
                 model: flashDeck.questions
-                Item {
-                    id: flashCard
-                    property bool submittedAnswer: false
-                    property bool correct: false
-                    property bool promptIsCantonese: index%2 === 0
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.verticalCenter: parent.verticalCenter
-                    anchors.verticalCenterOffset: -200
+                // one column per question in the quiz, only the current question is visible
+                Column {
+                    id: question
                     visible: index === flashDeck.deckIdx
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.top: parent.top
+                    anchors.topMargin: 300
+                    spacing: 20
+                    property bool submittedAllAnswers: false
+                    property var answers: modelData.answers
+
+                    // the question text
                     AppText {
                         id: prompt
                         anchors.horizontalCenter: parent.horizontalCenter
-                        text: flashCard.promptIsCantonese ? modelData.Cantonese : modelData.English
-                    }
-                    AppTextEdit {
-                        id: placeHolderText
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: "answer"
-                        visible: false // just used to set the placeholder text width
-                    }
-                    AppTextEdit {
-                        id: userResponse
-                        visible: !submittedAnswer
-                        anchors.top: prompt.bottom
-                        anchors.topMargin: 10
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        width: text === "" ? placeHolderText.paintedWidth : flashDeckComponent.width //userResponseSubmitted.paintedWidth
-                        placeholderText: focus ? "" : "answer"
-                        horizontalAlignment: TextEdit.AlignHCenter
-                        Keys.onReturnPressed: {
-                            focus = false
-                            flashCard.checkAnswer()
-                        }
-                    }
-                    AppText {
-                        id: userResponseSubmitted
-                        visible: submittedAnswer
-                        anchors.top: prompt.bottom
-                        anchors.topMargin: 10
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: flashCard.correct ? correctAnswer.text : userResponse.text
-                        color: flashCard.correct ? "green" : "red"
-                    }
-                    AppText {
-                        id: correctAnswer
-                        anchors.top: userResponse.bottom
-                        anchors.topMargin: 10
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: flashCard.promptIsCantonese ? modelData.English : modelData.Cantonese
-                        visible: flashCard.submittedAnswer && !flashCard.correct
-                    }
-                    AppButton {
-                        id: nextCardButton
-                        anchors.top: correctAnswer.bottom
-                        anchors.topMargin: 10
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        visible: flashCard.submittedAnswer
-                        text: index === quizLength - 1 ? "finish" : "next"
-                        onClicked: flashCard.nextQuestionOrReturnToMenu(index)
+                        text: modelData.question
                     }
 
-                    function checkAnswer() {
-                        flashCard.submittedAnswer = true
-                        var userResponseWithoutNumbers = userResponse.text.replace(/[0-9]/g, '').replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g,"")
-                        var correctAnswerWithoutNumbers = correctAnswer.text.replace(/[0-9]/g, '').replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g,"")
-                        if (userResponseWithoutNumbers.toLowerCase() === correctAnswerWithoutNumbers.toLowerCase()) {
-                            flashCard.correct = true
+                    // the answer text, which may be split up into multiple parts of the sentence
+                    Row {
+                        id: answers
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        spacing: 10
+                        Repeater {
+                            id: answerSubclauseRepeater
+                            model: modelData.answers //modelData.answers is each subclause
+                            Answer {
+                                answerable: modelData.isBlank
+                                correctAnswer: modelData.answer
+                                checkAnswerCallback: function() {
+                                    question.submittedAllAnswers = answers.allSubmitted()
+                                }
+                            }
                         }
+                        function allSubmitted() {
+                            for (var i = 0; i < question.answers.length; i++) {
+                                var answerSubclause = answerSubclauseRepeater.itemAt(i)
+                                if (answerSubclause.answerable && !answerSubclause.submittedAnswer) {
+                                    return false
+                                }
+                            }
+                            return true
+                        }
+                    }
+
+                    // button to move onto the next question or to finish the quiz
+                    AppButton {
+                        id: nextCardButton
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        visible: question.submittedAllAnswers
+                        text: index === quizLength - 1 ? "finish" : "next"
+                        onClicked: question.nextQuestionOrReturnToMenu(index)
                     }
 
                     function nextQuestionOrReturnToMenu(questionIdx) {
@@ -121,35 +108,6 @@ App {
                     }
                 }
             }
-        }
-    }
-
-    function selectCardsForQuiz() {
-        var shuffledVocab = shuffle(vocab)
-        return shuffledVocab.slice(0, quizLength)
-    }
-
-    // Fisher-Yates shuffle
-    function shuffle(array) {
-        var shuffledArray = array.slice()
-        for (let i = shuffledArray.length - 1; i > 0; i--) {
-            let j = Math.floor(Math.random() * (i + 1)); // random index from 0 to i
-            [shuffledArray[i], shuffledArray[j]] = [shuffledArray[j], shuffledArray[i]];
-        }
-        return shuffledArray
-    }
-
-    function parseJson(filePath) {
-        var vocabReader = fileUtils.readFile(Qt.resolvedUrl(filePath))
-        var vocabJson = JSON.parse(vocabReader)
-
-        for(var i = 0; i < vocabJson.length; i++) {
-            var sentenceAndTranslation = vocabJson[i]
-            sentenceAndTranslation.correctCantonese = 0
-            sentenceAndTranslation.incorrectCantonese = 0
-            sentenceAndTranslation.correctEnglish = 0
-            sentenceAndTranslation.incorrectEnglish = 0
-            vocab.push(sentenceAndTranslation)
         }
     }
 }
