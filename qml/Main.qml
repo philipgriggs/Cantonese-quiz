@@ -73,8 +73,8 @@ App {
                             id: answerSubclauseRepeater
                             model: question.questionAndAnswer.answers // answers is each subclause
                             Answer {
-                                answerable: modelData.isBlank
-                                correctAnswer: modelData.answer
+                                answerable: index === question.questionAndAnswer.blankIndex
+                                correctAnswer: modelData
                                 checkAnswerCallback: function(correct) {
                                     vocabStorage.incrementStats(question.questionAndAnswer, correct)
                                     question.submittedAllAnswers = answers.allSubmitted()

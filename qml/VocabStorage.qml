@@ -13,51 +13,54 @@ Item {
     // shuffle the questions and choose the first n to use in the quiz
     function selectCardsForQuiz() {
         var shuffledVocab = shuffleVocab()
-        var splitQuestionAndAnswers = []
-        for (var i = 0; i < quizLength; i++) {
+        var questionsAndAnswers = []
+        for (let i = 0; i < quizLength; i++) {
             // the answer may be either english or cantonese
-            var questionAndAnswer = {
-                "question": shuffledVocab[i].Cantonese,
-                "answer": shuffledVocab[i].English,
+            var questionAndAnswers = {
+                "question": shuffledVocab[i].Cantonese.join(''),
+                "answers": shuffledVocab[i].English,
                 "index": shuffledVocab[i].index,
                 "isEnglish": true
             }
-            if (i%2 === 0) {
-                questionAndAnswer.question = shuffledVocab[i].English
-                questionAndAnswer.answer = shuffledVocab[i].Cantonese
-                questionAndAnswer.isEnglish = false
+            // every other question is answered in cantonese, except if the user exceeded the required correct answers in Cantonese
+            // or the question is in cantonese if the user exceeded the required correct answers in English
+            if (i%2 === 0 && !checkRequiredCorrect(vocab[shuffledVocab[i].index].correctCantonese) || checkRequiredCorrect(vocab[shuffledVocab[i].index].correctEnglish)) {
+                questionAndAnswers.question = shuffledVocab[i].English.join('')
+                questionAndAnswers.answers = shuffledVocab[i].Cantonese
+                questionAndAnswers.isEnglish = false
             }
-            var splitQuestionAndAnswer = splitAnswers(questionAndAnswer)
-            splitQuestionAndAnswers.push(splitQuestionAndAnswer)
+            questionAndAnswers = chooseAnswer(questionAndAnswers)
+            questionsAndAnswers.push(questionAndAnswers)
         }
-        return splitQuestionAndAnswers
+        return questionsAndAnswers
     }
 
-    // split up the anwers by the special charset `\b`
-    function splitAnswers(questionAndAnswer) {
-        var splitAnswers = questionAndAnswer.answer.split('\b')
-        var blankAnswerIdx = Math.floor(Math.random()*splitAnswers.length)
-        var splitQuestionAndAnswer = {
-            "question": questionAndAnswer.question,
-            "answers": [],
-            "index": questionAndAnswer.index,
-            "isEnglish": questionAndAnswer.isEnglish
+    // choose which of the sub part of the sentence should be blank
+    function chooseAnswer(questionAndAnswers) {
+        var validAnswer = false
+        while (true) {
+            questionAndAnswers.blankIndex = Math.floor(Math.random()*questionAndAnswers.answers.length)
+            var correctAnswerCount = vocab[questionAndAnswers.index].correctCantonese
+            if (questionAndAnswers.isEnglish) {
+                correctAnswerCount = vocab[questionAndAnswers.index].correctEnglish
+            }
+            if (correctAnswerCount[questionAndAnswers.blankIndex] < requiredCorrect) {
+                break
+            }
         }
-        for (var i = 0; i < splitAnswers.length; i++) {
-            splitQuestionAndAnswer.answers.push({
-                                                    "answer": splitAnswers[i],
-                                                    "isBlank": i === blankAnswerIdx
-                                                })
-        }
-        return splitQuestionAndAnswer
+        return questionAndAnswers
     }
 
     // Fisher-Yates shuffle
     function shuffleVocab() {
         var chosenWords = []
-        for (var i = 0; i < vocab.length && chosenWords.length < learnedWords; i++) {
-            if (vocab[i].correctCantonese < requiredCorrect || vocab[i].correctEnglish < requiredCorrect) {
-                chosenWords.push(vocab[i])
+        for (let vocabIdx = 0; vocabIdx < vocab.length && chosenWords.length < learnedWords; vocabIdx++) {
+            if (!checkRequiredCorrect(vocab[vocabIdx].correctCantonese)) {
+                chosenWords.push(vocab[vocabIdx])
+                continue
+            }
+            if (!checkRequiredCorrect(vocab[vocabIdx].correctEnglish)) {
+                chosenWords.push(vocab[vocabIdx])
             }
         }
 
@@ -68,35 +71,51 @@ Item {
         return chosenWords
     }
 
+    // return true if all of the split answers exceed the required correct
+    function checkRequiredCorrect(correctArray) {
+        for (let answerIdx = 0; answerIdx < correctArray.length; answerIdx++) {
+            if (correctArray[answerIdx] < requiredCorrect) {
+                return false
+            }
+        }
+        return true
+    }
+
+    // read the json file and put into a local object
     function parseJson(filePath) {
         var vocabReader = fileUtils.readFile(Qt.resolvedUrl(filePath))
         var vocabJson = JSON.parse(vocabReader)
 
         for(var i = 0; i < vocabJson.length; i++) {
-            var sentenceAndTranslation = vocabJson[i]
-            sentenceAndTranslation.correctCantonese = 0
-            sentenceAndTranslation.correctEnglish = 0
-            sentenceAndTranslation.index = i
-            vocab.push(sentenceAndTranslation)
+            var splitCantonese = vocabJson[i].Cantonese.split('\b')
+            var splitEnglish = vocabJson[i].English.split('\b')
+            // object containing each sub answer (split by charset `\b`) and counter of how many of each were correct
+            vocab.push({
+                           "Cantonese": splitCantonese,
+                           "English": splitEnglish,
+                           "correctCantonese": new Array(splitCantonese.length).fill(0),
+                           "correctEnglish": new Array(splitEnglish.length).fill(0),
+                           "index": i,
+                       })
         }
     }
 
     function incrementStats(questionAndAnswer, correct) {
         var data = vocab[questionAndAnswer.index]
         if (questionAndAnswer.isEnglish && correct) {
-            data.correctEnglish++
+            data.correctEnglish[questionAndAnswer.blankIndex]++
             return
         }
         if (questionAndAnswer.isEnglish && !correct && data.correctEnglish > 0) {
-            data.correctEnglish--
+            data.correctEnglish[questionAndAnswer.blankIndex]--
             return
         }
         if (!questionAndAnswer.isEnglish && correct) {
-            data.correctCantonese++
+            data.correctCantonese[questionAndAnswer.blankIndex]++
             return
         }
         if (!questionAndAnswer.isEnglish && !correct && data.correctCantonese > 0) {
-            data.correctCantonese--
+            data.correctCantonese[questionAndAnswer.blankIndex]--
             return
         }
     }
