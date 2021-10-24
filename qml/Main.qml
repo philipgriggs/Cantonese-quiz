@@ -76,7 +76,7 @@ App {
                                 answerable: index === question.questionAndAnswer.blankIndex
                                 correctAnswer: modelData
                                 checkAnswerCallback: function(correct) {
-                                    vocabStorage.incrementStats(question.questionAndAnswer, correct)
+                                    vocabStorage.incrementStatsAndSave(question.questionAndAnswer, correct)
                                     question.submittedAllAnswers = answers.allSubmitted()
                                 }
                             }

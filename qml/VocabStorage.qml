@@ -8,7 +8,22 @@ Item {
     property var vocab: []
     property int quizLength
     property int learnedWords
-    property int requiredCorrect: 1
+    property int requiredCorrect: 3
+
+    // persistent storage
+    Storage {
+        id: persistentStorage
+
+        Component.onCompleted: {
+            var vocabPersisted = persistentStorage.getValue("vocab")
+            if (vocabPersisted) {
+                vocab = vocabPersisted
+            }
+        }
+        function save() {
+            persistentStorage.setValue("vocab", vocab)
+        }
+    }
 
     // shuffle the questions and choose the first n to use in the quiz
     function selectCardsForQuiz() {
@@ -98,6 +113,11 @@ Item {
                            "index": i,
                        })
         }
+    }
+
+    function incrementStatsAndSave(questionAndAnswer, correct) {
+        incrementStats(questionAndAnswer, correct)
+        persistentStorage.save()
     }
 
     function incrementStats(questionAndAnswer, correct) {
