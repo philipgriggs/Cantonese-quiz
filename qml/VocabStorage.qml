@@ -19,6 +19,7 @@ Item {
             if (vocabPersisted) {
                 vocab = vocabPersisted
             }
+            resetState()
         }
         function save() {
             persistentStorage.setValue("vocab", vocab)
@@ -30,6 +31,14 @@ Item {
         var shuffledVocab = shuffleVocab()
         var questionsAndAnswers = []
         for (let i = 0; i < quizLength; i++) {
+            // one of the questions might be a revision question of a previously learned word, so handle this special case
+            var got = getReminderQuestion(shuffledVocab[i], function(reminderQuestion) {
+                questionsAndAnswers.push(reminderQuestion)
+            })
+            if (got) {
+                continue
+            }
+
             // the answer may be either english or cantonese
             var questionAndAnswers = {
                 "question": shuffledVocab[i].Cantonese.join(''),
@@ -50,9 +59,34 @@ Item {
         return questionsAndAnswers
     }
 
+    // one of the questions might be a revision question of a previously learned word, so handle this special case
+    function getReminderQuestion(question, callback) {
+        if (!question.reminderQuestion) {
+            return false
+        }
+
+        if (question.isEnglish) {
+            callback({
+                         "question": question.Cantonese.join(''),
+                         "answers": question.English,
+                         "index": question.index,
+                         "isEnglish": true,
+                         "blankIndex": question.answerIndex
+                     })
+        } else {
+            callback({
+                         "question": question.English.join(''),
+                         "answers": question.Cantonese,
+                         "index": question.index,
+                         "isEnglish": false,
+                         "blankIndex": question.answerIndex
+                     })
+        }
+        return true
+    }
+
     // choose which of the sub part of the sentence should be blank
     function chooseAnswer(questionAndAnswers) {
-        var validAnswer = false
         while (true) {
             questionAndAnswers.blankIndex = Math.floor(Math.random()*questionAndAnswers.answers.length)
             var correctAnswerCount = vocab[questionAndAnswers.index].correctCantonese
@@ -78,12 +112,84 @@ Item {
                 chosenWords.push(vocab[vocabIdx])
             }
         }
+        var leastCorrect = leastCorrectQuestion()
+        if (leastCorrect) {
+            chosenWords[chosenWords.length-1] = leastCorrect
+        }
 
         for (let i = chosenWords.length - 1; i > 0; i--) {
             let j = Math.floor(Math.random() * (i + 1)); // random index from 0 to i
             [chosenWords[i], chosenWords[j]] = [chosenWords[j], chosenWords[i]];
         }
         return chosenWords
+    }
+
+    // return the question that has passed the correct requirement by the smallest amount
+    function leastCorrectQuestion() {
+        var leastCorrect = {
+            "vocabIndex": -1,
+            "answerIndex": -1,
+            "count": 1e9,
+            "isEnglish": false
+        }
+
+        forEach(vocab, function(vocabIdx, voc) {
+            var tentativeLeastCorrect = {
+                "vocabIndex": -1,
+                "count": 1e9
+            }
+
+            var allCorrect = true
+            forEach(voc.correctCantonese, function(answerIdx, correctCount) {
+                allCorrect = allCorrect && correctCount >= requiredCorrect
+                if (correctCount >= requiredCorrect && correctCount < leastCorrect.count && correctCount < tentativeLeastCorrect.count) {
+                    tentativeLeastCorrect = {
+                        "vocabIndex": vocabIdx,
+                        "answerIndex": answerIdx,
+                        "count": correctCount,
+                        "isEnglish": false
+                    }
+                }
+            })
+            if (allCorrect && tentativeLeastCorrect.vocabIndex !== -1) {
+                leastCorrect = tentativeLeastCorrect
+            }
+            allCorrect = false
+            tentativeLeastCorrect = {
+                "vocabIndex": -1,
+                "count": 1e9
+            }
+
+            forEach(voc.correctEnglish, function(answerIdx, correctCount) {
+                allCorrect = allCorrect && correctCount >= requiredCorrect
+                if (correctCount >= requiredCorrect && correctCount < leastCorrect.count && correctCount < tentativeLeastCorrect.count) {
+                    tentativeLeastCorrect = {
+                        "vocabIndex": vocabIdx,
+                        "anserIndex": answerIdx,
+                        "count": correctCount,
+                        "isEnglish": true
+                    }
+                }
+            })
+            if (allCorrect && tentativeLeastCorrect.vocabIndex !== -1) {
+                leastCorrect = tentativeLeastCorrect
+            }
+        })
+
+        if (leastCorrect.vocabIndex === -1) {
+            return null
+        }
+        var v = vocab[leastCorrect.vocabIndex]
+        v.reminderQuestion = true
+        v.isEnglish = leastCorrect.isEnglish
+        v.answerIndex = leastCorrect.answerIndex
+        return v
+    }
+
+    function forEach(array, callback) {
+        for (let idx = 0; idx < array.length; idx++) {
+            callback(idx, array[idx])
+        }
     }
 
     // return true if all of the split answers exceed the required correct
@@ -138,5 +244,11 @@ Item {
             data.correctCantonese[questionAndAnswer.blankIndex]--
             return
         }
+    }
+
+    function resetState() {
+        forEach(vocab, function(vocabIdx, voc) {
+            voc.reminderQuestion = false
+        })
     }
 }
