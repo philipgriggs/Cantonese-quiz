@@ -55,7 +55,7 @@ Item {
         answer.submittedAnswer = true
         // remove any numbers, punctuation, leading, trailing or double spaces
         var userResponseWithoutNumbers = userResponse.text.replace(/[0-9]/g,'').replace(/[.,\/#!$%\^&\*;:{}=?\-_`~()]/g,'').replace(/^\s+/g,"").replace(/\s+$/g,'').replace(/\s+/g,' ')
-        var correctAnswerWithoutNumbers = answer.correctAnswer.replace(/[0-9]/g,'').replace(/[.,\/#!$%\^&\*;:{}=?\-_`~()]/g,'').replace(/^\s+/g,"").replace(/\s+$/g,'')
+        var correctAnswerWithoutNumbers = answer.correctAnswer.replace(/[0-9]/g,'').replace(/[.,\/#!$%\^&\*;:{}=?\-_`~()]/g,'').replace(/^\s+/g,"").replace(/\s+$/g,'').replace(/\s+/g,' ')
         if (userResponseWithoutNumbers.toLowerCase() === correctAnswerWithoutNumbers.toLowerCase()) {
             answer.correct = true
         }
