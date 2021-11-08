@@ -7,8 +7,8 @@ App {
 
     VocabStorage {
         id: vocabStorage
-        quizLength: 5
-        learnedWords: 10
+        quizLength: 10
+        learnedWords: 20
     }
 
     NavigationStack {
@@ -90,6 +90,12 @@ App {
                             }
                             return true
                         }
+                    }
+                    AppText {
+                        text: 'correct cantonese: ' + vocabStorage.vocab[question.questionAndAnswer.index].correctCantonese.join()
+                    }
+                    AppText {
+                        text: 'correct english: ' + vocabStorage.vocab[question.questionAndAnswer.index].correctEnglish.join()
                     }
 
                     // button to move onto the next question or to finish the quiz
