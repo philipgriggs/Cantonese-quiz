@@ -2,12 +2,13 @@ import Felgo 3.0
 import QtQuick 2.0
 
 App {
-    property var quizLength: 10
     screenWidth: 720
     screenHeight: 1280
 
     VocabStorage {
         id: vocabStorage
+        quizLength: 10
+        learnedWords: 20
     }
 
     NavigationStack {
@@ -54,7 +55,7 @@ App {
                     anchors.topMargin: 300
                     spacing: 20
                     property bool submittedAllAnswers: false
-                    property var answers: modelData.answers
+                    property var questionAndAnswer: modelData
 
                     // the question text
                     AppText {
@@ -70,17 +71,18 @@ App {
                         spacing: 10
                         Repeater {
                             id: answerSubclauseRepeater
-                            model: modelData.answers //modelData.answers is each subclause
+                            model: question.questionAndAnswer.answers // answers is each subclause
                             Answer {
-                                answerable: modelData.isBlank
-                                correctAnswer: modelData.answer
-                                checkAnswerCallback: function() {
+                                answerable: index === question.questionAndAnswer.blankIndex
+                                correctAnswer: modelData
+                                checkAnswerCallback: function(correct) {
+                                    vocabStorage.incrementStatsAndSave(question.questionAndAnswer, correct)
                                     question.submittedAllAnswers = answers.allSubmitted()
                                 }
                             }
                         }
                         function allSubmitted() {
-                            for (var i = 0; i < question.answers.length; i++) {
+                            for (var i = 0; i < question.questionAndAnswer.answers.length; i++) {
                                 var answerSubclause = answerSubclauseRepeater.itemAt(i)
                                 if (answerSubclause.answerable && !answerSubclause.submittedAnswer) {
                                     return false
@@ -89,18 +91,24 @@ App {
                             return true
                         }
                     }
+                    AppText {
+                        text: 'correct cantonese: ' + vocabStorage.vocab[question.questionAndAnswer.index].correctCantonese.join()
+                    }
+                    AppText {
+                        text: 'correct english: ' + vocabStorage.vocab[question.questionAndAnswer.index].correctEnglish.join()
+                    }
 
                     // button to move onto the next question or to finish the quiz
                     AppButton {
                         id: nextCardButton
                         anchors.horizontalCenter: parent.horizontalCenter
                         visible: question.submittedAllAnswers
-                        text: index === quizLength - 1 ? "finish" : "next"
+                        text: index === vocabStorage.quizLength - 1 ? "finish" : "next"
                         onClicked: question.nextQuestionOrReturnToMenu(index)
                     }
 
                     function nextQuestionOrReturnToMenu(questionIdx) {
-                        if (questionIdx === quizLength-1) {
+                        if (questionIdx === vocabStorage.quizLength-1) {
                             navigationStack.push(titlePageComponent)
                         } else {
                             flashDeck.deckIdx++
