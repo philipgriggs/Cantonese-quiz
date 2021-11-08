@@ -139,9 +139,13 @@ Item {
                 "count": 1e9
             }
 
+            // iterate the score of the cantonese answers
             var allCorrect = true
             forEach(voc.correctCantonese, function(answerIdx, correctCount) {
+                // only consider answers where all subclauses are correct
                 allCorrect = allCorrect && correctCount >= requiredCorrect
+
+                // keep this question if it's correct, and less that the current minimum, and the minimum in this iteration
                 if (correctCount >= requiredCorrect && correctCount < leastCorrect.count && correctCount < tentativeLeastCorrect.count) {
                     tentativeLeastCorrect = {
                         "vocabIndex": vocabIdx,
@@ -151,17 +155,23 @@ Item {
                     }
                 }
             })
+            // we found a possible minimum candidate
             if (allCorrect && tentativeLeastCorrect.vocabIndex !== -1) {
                 leastCorrect = tentativeLeastCorrect
             }
+            // reset variables
             allCorrect = false
             tentativeLeastCorrect = {
                 "vocabIndex": -1,
                 "count": 1e9
             }
 
+            // iterate the score of the english answers
             forEach(voc.correctEnglish, function(answerIdx, correctCount) {
+                // only consider answers where all subclauses are correct
                 allCorrect = allCorrect && correctCount >= requiredCorrect
+
+                // keep this question if it's correct, and less that the current minimum, and the minimum in this iteration
                 if (correctCount >= requiredCorrect && correctCount < leastCorrect.count && correctCount < tentativeLeastCorrect.count) {
                     tentativeLeastCorrect = {
                         "vocabIndex": vocabIdx,
@@ -171,6 +181,7 @@ Item {
                     }
                 }
             })
+            // we found a possible minimum candidate
             if (allCorrect && tentativeLeastCorrect.vocabIndex !== -1) {
                 leastCorrect = tentativeLeastCorrect
             }
