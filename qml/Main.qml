@@ -14,7 +14,6 @@ App {
     NavigationStack {
         id: navigationStack
         Component.onCompleted: {
-            vocabStorage.parseJson("../assets/vocab.json")
             navigationStack.push(titlePageComponent)
         }
     }

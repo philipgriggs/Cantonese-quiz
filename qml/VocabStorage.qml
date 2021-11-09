@@ -15,11 +15,11 @@ Item {
         id: persistentStorage
 
         Component.onCompleted: {
+            parseJson("../assets/vocab.json")
             var vocabPersisted = persistentStorage.getValue("vocab")
             if (vocabPersisted) {
-                vocab = vocabPersisted
+                loadState(vocabPersisted)
             }
-            resetState()
         }
         function save() {
             persistentStorage.setValue("vocab", vocab)
@@ -257,9 +257,14 @@ Item {
         }
     }
 
-    function resetState() {
-        forEach(vocab, function(vocabIdx, voc) {
-            voc.reminderQuestion = false
+    function loadState(vocabPersisted) {
+        forEach(vocabPersisted, function(idx, vocabPersist) {
+            if (vocab[idx].Cantonese.length === vocabPersist.Cantonese.length) {
+                vocab[idx].correctCantonese = vocabPersist.correctCantonese
+            }
+            if (vocab[idx].English.length === vocabPersist.English.length) {
+                vocab[idx].correctEnglish = vocabPersist.correctEnglish
+            }
         })
     }
 }
