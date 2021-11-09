@@ -60,5 +60,7 @@ macx {
 }
 
 DISTFILES += \
-    qml/VocabStorage.qml
+    qml/VocabList.qml \
+    qml/VocabStorage.qml \
+    qml/FlashDeck.qml \
     qml/Answer.qml
