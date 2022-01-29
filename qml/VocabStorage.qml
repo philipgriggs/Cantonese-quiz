@@ -48,7 +48,9 @@ Item {
             }
             // every other question is answered in cantonese, except if the user exceeded the required correct answers in Cantonese
             // or the question is in cantonese if the user exceeded the required correct answers in English
-            if (i%2 === 0 && !checkRequiredCorrect(vocab[shuffledVocab[i].index].correctCantonese) || checkRequiredCorrect(vocab[shuffledVocab[i].index].correctEnglish)) {
+            var correctCantonese = checkRequiredCorrect(vocab[shuffledVocab[i].index].correctCantonese)
+            var correctEnglish = checkRequiredCorrect(vocab[shuffledVocab[i].index].correctEnglish)
+            if (i%2 === 0 && !correctCantonese.allCorrect || correctEnglish.allCorrect) {
                 questionAndAnswers.question = shuffledVocab[i].English.join('')
                 questionAndAnswers.answers = shuffledVocab[i].Cantonese
                 questionAndAnswers.isEnglish = false
@@ -59,6 +61,18 @@ Item {
         return questionsAndAnswers
     }
 
+    function selectCardsForRevision() {
+        var sortedVocab = sortByLeastCorrect()
+        var leastCorrectWords = extractAlreadyLearnedWords(sortedVocab)
+
+        for (let i = leastCorrectWords.length - 1; i > 0; i--) {
+            let j = Math.floor(Math.random() * (i + 1)); // random index from 0 to i
+            [leastCorrectWords[i], leastCorrectWords[j]] = [leastCorrectWords[j], leastCorrectWords[i]];
+        }
+
+        return leastCorrectWords
+    }
+
     // one of the questions might be a revision question of a previously learned word, so handle this special case
     function getReminderQuestion(question, callback) {
         if (!question.reminderQuestion) {
@@ -66,21 +80,9 @@ Item {
         }
 
         if (question.isEnglish) {
-            callback({
-                         "question": question.Cantonese.join(''),
-                         "answers": question.English,
-                         "index": question.index,
-                         "isEnglish": true,
-                         "blankIndex": question.answerIndex
-                     })
+            callback(vocabToQuizQuestion(question, false))
         } else {
-            callback({
-                         "question": question.English.join(''),
-                         "answers": question.Cantonese,
-                         "index": question.index,
-                         "isEnglish": false,
-                         "blankIndex": question.answerIndex
-                     })
+            callback(vocabToQuizQuestion(question, true))
         }
         return true
     }
@@ -104,11 +106,13 @@ Item {
     function shuffleVocab() {
         var chosenWords = []
         for (let vocabIdx = 0; vocabIdx < vocab.length && chosenWords.length < learnedWords; vocabIdx++) {
-            if (!checkRequiredCorrect(vocab[vocabIdx].correctCantonese)) {
+            var correctCantonese = checkRequiredCorrect(vocab[vocabIdx].correctCantonese)
+            var correctEnglish = checkRequiredCorrect(vocab[vocabIdx].correctEnglish)
+            if (!correctCantonese.allCorrect) {
                 chosenWords.push(vocab[vocabIdx])
                 continue
             }
-            if (!checkRequiredCorrect(vocab[vocabIdx].correctEnglish)) {
+            if (!correctEnglish.allCorrect) {
                 chosenWords.push(vocab[vocabIdx])
             }
         }
@@ -122,6 +126,79 @@ Item {
             [chosenWords[i], chosenWords[j]] = [chosenWords[j], chosenWords[i]];
         }
         return chosenWords
+    }
+
+    function sortByLeastCorrect() {
+        let vocabCopy = vocab.slice()
+        vocabCopy.sort(function compare(a, b) {
+            var leastCorrectA = leastCorrectEnglishOrCantonese(a)
+            var leastCorrectB = leastCorrectEnglishOrCantonese(b)
+            if (leastCorrectA < leastCorrectB) {
+                return -1
+            }
+            if (leastCorrectA > leastCorrectB) {
+                return 1
+            }
+            return 0
+        })
+        return vocabCopy
+    }
+
+    function extractAlreadyLearnedWords(sortedVocab) {
+        var chosenWords = []
+        var smallestCorrect = -1
+        forEach(sortedVocab, function(index, voc) {
+            if (chosenWords.length > quizLength) {
+                return
+            }
+
+            var correctCantonese = checkRequiredCorrect(voc.correctCantonese)
+            var correctEnglish = checkRequiredCorrect(voc.correctEnglish)
+            if (!correctCantonese.allCorrect || !correctEnglish.allCorrect) {
+                return
+            }
+            if (smallestCorrect === -1) {
+                smallestCorrect = Math.min(correctCantonese.smallestCorrect, correctEnglish.smallestCorrect)
+                if (correctCantonese.smallestCorrect < correctEnglish.smallestCorrect) {
+                    voc.answerIndex = correctCantonese.smallestCorrectIndex
+                    chosenWords.push(vocabToQuizQuestion(voc, false))
+                } else {
+                    voc.answerIndex = correctEnglish.smallestCorrectIndex
+                    chosenWords.push(vocabToQuizQuestion(voc, true))
+                }
+                return
+            }
+            if (correctCantonese.smallestCorrect >= smallestCorrect || correctEnglish.smallestCorrect >= smallestCorrect) {
+                if (correctCantonese.smallestCorrect < correctEnglish.smallestCorrect) {
+                    voc.answerIndex = correctCantonese.smallestCorrectIndex
+                    chosenWords.push(vocabToQuizQuestion(voc, false))
+                } else {
+                    voc.answerIndex = correctEnglish.smallestCorrectIndex
+                    chosenWords.push(vocabToQuizQuestion(voc, true))
+                }
+            }
+        })
+        return chosenWords
+    }
+
+    function vocabToQuizQuestion(voc, cantoneseQuestion) {
+        if (cantoneseQuestion) {
+            return {
+                "question": voc.Cantonese.join(''),
+                "answers": voc.English,
+                "index": voc.index,
+                "isEnglish": true,
+                "blankIndex": voc.answerIndex
+            }
+        }
+
+        return {
+            "question": voc.English.join(''),
+            "answers": voc.Cantonese,
+            "index": voc.index,
+            "isEnglish": false,
+            "blankIndex": voc.answerIndex
+        }
     }
 
     // return the question that has passed the correct requirement by the smallest amount
@@ -197,6 +274,23 @@ Item {
         return v
     }
 
+    // find the least correct answer out of both english and cantonese words
+    function leastCorrectEnglishOrCantonese(voc) {
+        var leastCorrectCount = 1e9
+        forEach(voc.correctCantonese, function(answerIdx, correctCount) {
+            if (correctCount < leastCorrectCount) {
+                leastCorrectCount = correctCount
+            }
+        })
+        forEach(voc.correctEnglish, function(answerIdx, correctCount) {
+            if (correctCount < leastCorrectCount) {
+                leastCorrectCount = correctCount
+            }
+        })
+
+        return leastCorrectCount
+    }
+
     function forEach(array, callback) {
         for (let idx = 0; idx < array.length; idx++) {
             callback(idx, array[idx])
@@ -205,12 +299,20 @@ Item {
 
     // return true if all of the split answers exceed the required correct
     function checkRequiredCorrect(correctArray) {
+        var smallestCorrect = 1e9
+        var smallestCorrectIndex = 0
+        var allCorrect = true
         for (let answerIdx = 0; answerIdx < correctArray.length; answerIdx++) {
             if (correctArray[answerIdx] < requiredCorrect) {
-                return false
+                allCorrect = false
+            }
+
+            if (correctArray[answerIdx] < smallestCorrect) {
+                smallestCorrect = correctArray[answerIdx]
+                smallestCorrectIndex = answerIdx
             }
         }
-        return true
+        return {'allCorrect': allCorrect, 'smallestCorrect': smallestCorrect, 'smallestCorrectIndex': smallestCorrectIndex}
     }
 
     // read the json file and put into a local object
@@ -259,6 +361,9 @@ Item {
 
     function loadState(vocabPersisted) {
         forEach(vocabPersisted, function(idx, vocabPersist) {
+            if (idx >= vocab.length) {
+                return
+            }
             if (vocab[idx].Cantonese.length === vocabPersist.Cantonese.length) {
                 vocab[idx].correctCantonese = vocabPersist.correctCantonese
             }

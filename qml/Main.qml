@@ -2,8 +2,12 @@ import Felgo 3.0
 import QtQuick 2.0
 
 App {
+    id: app
+
     screenWidth: 720
     screenHeight: 1280
+
+    property bool revisionMode: false
 
     VocabStorage {
         id: vocabStorage
@@ -27,6 +31,14 @@ App {
                 AppButton {
                     text: "Start"
                     onClicked: {
+                        revisionMode = false
+                        navigationStack.push(flashDeckComponent)
+                    }
+                }
+                AppButton {
+                    text: "Review"
+                    onClicked: {
+                        revisionMode = true
                         navigationStack.push(flashDeckComponent)
                     }
                 }
@@ -45,7 +57,11 @@ App {
         FlashDeck {
             id: flashDeck
             Component.onCompleted: {
-                flashDeck.questions = vocabStorage.selectCardsForQuiz()
+                if (app.revisionMode) {
+                    flashDeck.questions = vocabStorage.selectCardsForRevision()
+                } else {
+                    flashDeck.questions = vocabStorage.selectCardsForQuiz()
+                }
             }
         }
     }
