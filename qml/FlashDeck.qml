@@ -67,12 +67,12 @@ Page {
                 id: nextCardButton
                 anchors.horizontalCenter: parent.horizontalCenter
                 visible: question.submittedAllAnswers
-                text: index === vocabStorage.quizLength - 1 ? "finish" : "next"
+                text: index === flashDeck.questions.length - 1 ? "finish" : "next"
                 onClicked: question.nextQuestionOrReturnToMenu(index)
             }
 
             function nextQuestionOrReturnToMenu(questionIdx) {
-                if (questionIdx === vocabStorage.quizLength-1) {
+                if (questionIdx === flashDeck.questions.length-1) {
                     navigationStack.push(titlePageComponent)
                 } else {
                     flashDeck.deckIdx++
